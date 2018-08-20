@@ -21,14 +21,17 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.CharBuffer;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.lang.Nullable;
+import org.springframework.util.Assert;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.ObjectUtils;
 
@@ -51,6 +54,17 @@ import org.springframework.util.ObjectUtils;
  * @see RestTemplate#setErrorHandler
  */
 public class DefaultResponseErrorHandler implements ResponseErrorHandler {
+
+	private HttpErrorDetailsExtractor httpErrorDetailsExtractor = new DefaultHttpErrorDetailsExtractor();
+
+	/**
+	 * Set the error summary extractor.
+	 * <p>By default, DefaultResponseErrorHandler uses a {@link DefaultHttpErrorDetailsExtractor}.
+	 */
+	public void setHttpErrorDetailsExtractor(HttpErrorDetailsExtractor httpErrorDetailsExtractor) {
+		Assert.notNull(httpErrorDetailsExtractor, "HttpErrorDetailsExtractor must not be null");
+		this.httpErrorDetailsExtractor = httpErrorDetailsExtractor;
+	}
 
 	/**
 	 * Delegates to {@link #hasError(HttpStatus)} (for a standard status enum value) or
@@ -109,7 +123,7 @@ public class DefaultResponseErrorHandler implements ResponseErrorHandler {
 	 * {@link HttpStatus} enum range.
 	 * </ul>
 	 * @throws UnknownHttpStatusCodeException in case of an unresolvable status code
-	 * @see #handleError(ClientHttpResponse, HttpStatus)
+	 * @see #handleError(URI, HttpMethod, ClientHttpResponse, HttpStatus)
 	 */
 	@Override
 	public void handleError(ClientHttpResponse response) throws IOException {
@@ -123,6 +137,24 @@ public class DefaultResponseErrorHandler implements ResponseErrorHandler {
 					response.getHeaders(), body, getCharset(response));
 		}
 		handleError(response, statusCode);
+	}
+
+	/**
+	 * Delegates to {@link #handleError(URI, HttpMethod, ClientHttpResponse, HttpStatus)} with the
+	 * response status code.
+	 * @throws UnknownHttpStatusCodeException in case of an unresolvable status code
+	 * @see #handleError(URI, HttpMethod, ClientHttpResponse, HttpStatus)
+	 */
+	@Override
+	public void handleError(URI url, HttpMethod method, ClientHttpResponse response) throws IOException {
+		HttpStatus statusCode = HttpStatus.resolve(response.getRawStatusCode());
+		if (statusCode == null) {
+			byte[] body = getResponseBody(response);
+			String message = httpErrorDetailsExtractor.getErrorDetails(response.getRawStatusCode(), response.getStatusText(), body, getCharset(response), url, method);
+			throw new UnknownHttpStatusCodeException(message, response.getRawStatusCode(), response.getStatusText(),
+					response.getHeaders(), body, getCharset(response));
+		}
+		handleError(url, method, response, statusCode);
 	}
 
 	/**
@@ -175,11 +207,28 @@ public class DefaultResponseErrorHandler implements ResponseErrorHandler {
 	 * @see HttpServerErrorException#create
 	 */
 	protected void handleError(ClientHttpResponse response, HttpStatus statusCode) throws IOException {
+		handleError(null, null, response, statusCode);
+	}
+
+	/**
+	 * Handle the error in the given response with the given resolved status code.
+	 * <p>This default implementation throws a {@link HttpClientErrorException} if the response status code
+	 * is {@link org.springframework.http.HttpStatus.Series#CLIENT_ERROR}, a {@link HttpServerErrorException}
+	 * if it is {@link org.springframework.http.HttpStatus.Series#SERVER_ERROR},
+	 * and a {@link RestClientException} in other cases.
+	 * @since 5.0
+	 */
+	protected void handleError(@Nullable URI url, @Nullable HttpMethod method, ClientHttpResponse response,
+			HttpStatus statusCode) throws IOException {
+
 		String statusText = response.getStatusText();
 		HttpHeaders headers = response.getHeaders();
 		byte[] body = getResponseBody(response);
 		Charset charset = getCharset(response);
 		String message = getErrorMessage(statusCode.value(), statusText, body, charset);
+
+//		TODO: add a separate extractor
+//		String message = httpErrorDetailsExtractor.getErrorDetails(statusCode.value(), statusText, body, charset, url, method);
 
 		switch (statusCode.series()) {
 			case CLIENT_ERROR:

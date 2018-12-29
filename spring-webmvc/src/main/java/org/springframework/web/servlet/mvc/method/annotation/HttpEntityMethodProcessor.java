@@ -33,6 +33,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -201,7 +202,9 @@ public class HttpEntityMethodProcessor extends AbstractMessageConverterMethodPro
 
 		if (responseEntity instanceof ResponseEntity) {
 			int returnStatus = ((ResponseEntity<?>) responseEntity).getStatusCodeValue();
-			outputMessage.getServletResponse().setStatus(returnStatus);
+
+			handleReturnStatus(outputMessage, returnStatus);
+
 			if (returnStatus == 200) {
 				if (SAFE_METHODS.contains(inputMessage.getMethod())
 						&& isResourceNotModified(inputMessage, outputMessage)) {
@@ -224,6 +227,25 @@ public class HttpEntityMethodProcessor extends AbstractMessageConverterMethodPro
 
 		// Ensure headers are flushed even if no body was written.
 		outputMessage.flush();
+	}
+
+	private void handleReturnStatus(ServletServerHttpResponse outputMessage, int returnStatus) throws IOException {
+		if (isValidHttpError(returnStatus)) {
+			HttpStatus httpStatus = HttpStatus.valueOf(returnStatus);
+			outputMessage.getServletResponse().sendError(returnStatus, httpStatus.getReasonPhrase());
+		} else {
+			outputMessage.getServletResponse().setStatus(returnStatus);
+		}
+	}
+
+	private boolean isValidHttpError(int returnStatus) {
+		HttpStatus httpStatus = HttpStatus.resolve(returnStatus);
+
+		if (httpStatus == null) {
+			return false;
+		}
+
+		return httpStatus.isError();
 	}
 
 	private List<String> getVaryRequestHeadersToAdd(HttpHeaders responseHeaders, HttpHeaders entityHeaders) {

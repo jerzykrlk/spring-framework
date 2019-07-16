@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -140,7 +140,6 @@ class UndertowServerHttpRequest extends AbstractServerHttpRequest {
 
 		private final ByteBufferPool byteBufferPool;
 
-
 		public RequestBodyPublisher(HttpServerExchange exchange, DataBufferFactory bufferFactory) {
 			super(UndertowServerHttpRequest.this.getLogPrefix());
 			this.channel = exchange.getRequestChannel();
@@ -206,6 +205,7 @@ class UndertowServerHttpRequest extends AbstractServerHttpRequest {
 			// Nothing to discard since we pass data buffers on immediately..
 		}
 	}
+
 
 	private static class UndertowDataBuffer implements PooledDataBuffer {
 
@@ -316,8 +316,7 @@ class UndertowServerHttpRequest extends AbstractServerHttpRequest {
 		}
 
 		@Override
-		public DataBuffer read(byte[] destination, int offset,
-				int length) {
+		public DataBuffer read(byte[] destination, int offset, int length) {
 			return this.dataBuffer.read(destination, offset, length);
 		}
 
@@ -332,20 +331,17 @@ class UndertowServerHttpRequest extends AbstractServerHttpRequest {
 		}
 
 		@Override
-		public DataBuffer write(byte[] source, int offset,
-				int length) {
+		public DataBuffer write(byte[] source, int offset, int length) {
 			return this.dataBuffer.write(source, offset, length);
 		}
 
 		@Override
-		public DataBuffer write(
-				DataBuffer... buffers) {
+		public DataBuffer write(DataBuffer... buffers) {
 			return this.dataBuffer.write(buffers);
 		}
 
 		@Override
-		public DataBuffer write(
-				ByteBuffer... byteBuffers) {
+		public DataBuffer write(ByteBuffer... byteBuffers) {
 			return this.dataBuffer.write(byteBuffers);
 		}
 
@@ -384,4 +380,5 @@ class UndertowServerHttpRequest extends AbstractServerHttpRequest {
 			return this.dataBuffer.asOutputStream();
 		}
 	}
+
 }
